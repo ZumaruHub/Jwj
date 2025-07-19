@@ -1,0 +1,667 @@
+
+
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+local Window = WindUI:CreateWindow({
+    Title = "Name Hub",
+    Icon = "rbxassetid://",
+    Author = "by vinh.",
+    Folder = "Name Hub",
+    Size = UDim2.fromOffset(580, 340),
+    Transparent = true,
+    Theme = "Dark",
+    Resizable = true,
+    SideBarWidth = 200,
+    Background = "", 
+    BackgroundImageTransparency = 0.42,
+    HideSearchBar = true,
+    ScrollBarEnabled = false,
+    KeySystem = { 
+        Key = { "plrzqvktjm" },
+        Note = "Get key",
+        URL = "", --link discro hoặc link bên ngoài 
+        SaveKey = false,
+    },
+})
+
+
+
+local Tabs = {
+	Info = Window:Tab({ Title = "Info", Icon = "info" }),
+    Main = Window:Tab({ Title = "Main", Icon = "book" }),
+    Bring = Window:Tab({ Title = "Bring", Icon = "gem" }),
+    Teleport= Window:Tab({ Title = "Teleport", Icon = "compass" }),
+    Esp = Window:Tab({ Title = "Esp", Icon = "ghost" }),
+}
+
+Window:SelectTab(1)
+
+
+Tabs.Info:Button({
+    Title = "Copy link discord",
+    Callback = function()
+      
+    end
+})
+
+Tabs.Main:Section({Title = "Farm"})
+
+
+
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Backpack = LocalPlayer:WaitForChild("Backpack")
+local ToolDamageObject = ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("ToolDamageObject")
+
+
+
+
+
+local autoTreeFarmActive = false
+local autoTreeFarmThread
+
+
+
+
+local autoTreeFarmActive = false
+local autoTreeFarmThread
+
+local function getAllTrees()
+	local map = workspace:FindFirstChild("Map")
+	if not map then return {} end
+	local landmarks = map:FindFirstChild("Landmarks") or map:FindFirstChild("Foliage")
+	if not landmarks then return {} end
+
+	local trees = {}
+	for _, tree in ipairs(landmarks:GetChildren()) do
+		if tree.Name == "Small Tree" and tree:IsA("Model") and tree.Parent then
+			local trunk = tree:FindFirstChild("Trunk") or tree.PrimaryPart
+			if trunk then
+				table.insert(trees, { tree = tree, trunk = trunk })
+			end
+		end
+	end
+	return trees
+end
+
+local function getAxe()
+	local inv = LocalPlayer:FindFirstChild("Inventory")
+	if not inv then return nil end
+	return inv:FindFirstChild("Old Axe") or inv:FindFirstChildWhichIsA("Tool")
+end
+
+function toggleAutoTreeFarm(state)
+	autoTreeFarmActive = state
+
+	if state then
+		autoTreeFarmThread = task.spawn(function()
+			while autoTreeFarmActive do
+				local trees = getAllTrees()
+				for _, t in ipairs(trees) do
+					if not autoTreeFarmActive then break end
+					if t.tree and t.tree.Parent then
+						local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+						local hrp = char:FindFirstChild("HumanoidRootPart")
+						if hrp and t.trunk then
+							local offset = {
+								Vector3.new(3, 0, 0),
+								Vector3.new(-3, 0, 0),
+								Vector3.new(0, 0, 3),
+								Vector3.new(0, 0, -3)
+							}
+							local randomOffset = offset[math.random(1, #offset)]
+							hrp.CFrame = CFrame.new(t.trunk.Position + randomOffset, t.trunk.Position)
+
+							task.wait(0.1)
+
+							local axe = getAxe()
+							if axe then
+								if axe.Parent == Backpack then
+									axe.Parent = char
+									task.wait(0.15)
+								end
+
+								while t.tree.Parent and autoTreeFarmActive do
+									pcall(function() axe:Activate() end)
+									local args = {
+										t.tree,
+										axe,
+										"1_8264699301",
+										t.trunk.CFrame
+									}
+									pcall(function() ToolDamageObject:InvokeServer(unpack(args)) end)
+									task.wait(1)
+								end
+							end
+						end
+					end
+					task.wait(0.5)
+				end
+				task.wait(1)
+			end
+		end)
+	else
+		autoTreeFarmActive = false
+	end
+end
+
+
+
+
+
+
+Tabs.Main:Toggle({
+    Title = "Auto farm tree",
+    Value = false,
+    Callback = function(state)
+    toggleAutoTreeFarm(state)
+    end
+})
+
+Tabs.Main:Toggle({
+    Title = "Auto click farm tree",
+    Value = false,
+    Callback = function(state)
+    autoClickEnabled = state
+    if autoClickEnabled then
+        autoClickThread = task.spawn(function()
+            while autoClickEnabled do
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+                task.wait(0.05)
+                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+                task.wait(0.05)
+            end
+        end)
+    else
+        if autoClickThread then
+            task.cancel(autoClickThread)
+            autoClickThread = nil
+        end
+    end     
+    end
+})
+
+
+Tabs.Main:Section({Title = "Hitbox"})
+
+
+
+
+
+
+local hitboxSize = Vector3.new(15, 15, 15)
+
+local hitboxBunny = false
+local hitboxWolf = false
+local hitboxCultist = false
+
+local function updateHitboxForModel(model)
+    local root = model:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    local name = model.Name:lower()
+    local shouldResize =
+        (hitboxWolf and (name:find("wolf") or name:find("alpha"))) or
+        (hitboxBunny and name:find("bunny")) or
+        (hitboxCultist and (name:find("cultist") or name:find("cross")))
+
+    if shouldResize then
+        root.Size = hitboxSize
+        root.Transparency = 0.5
+        root.Color = Color3.fromRGB(241, 196, 15) 
+        root.Material = Enum.Material.ForceField
+        root.CanCollide = false
+    else
+        root.Transparency = 1
+        root.Material = Enum.Material.Plastic
+    end
+end
+
+task.spawn(function()
+    while true do
+        for _, model in ipairs(workspace:GetDescendants()) do
+            if model:IsA("Model") and model:FindFirstChild("HumanoidRootPart") then
+                updateHitboxForModel(model)
+            end
+        end
+        task.wait(1.5)
+    end
+end)
+
+
+
+
+Tabs.Main:Slider({
+ Title = "Hitbox size", 
+ Value = {Min=2, Max=30, Default=10}, Step=1, 
+ Callback = function(value) 
+ hitboxSize = Vector3.new(value, value, value)
+ end
+})
+
+
+
+
+Tabs.Main:Toggle({
+ Title = "Wolf", 
+ Callback = function(value) 
+ hitboxWolf = value
+end
+})
+
+Tabs.Main:Toggle({
+ Title= "Bunny", 
+ Callback = function(value) 
+ hitboxBunny = value
+end
+})
+
+
+Tabs.Main:Toggle({
+ Title = "Cultist", 
+ Callback = function(value) 
+ hitboxCultist = value
+end
+})
+
+
+
+
+Tabs.Bring:Section({Title = "Fuel item"})
+
+
+
+
+
+local fuelItems = {
+    "Log",
+    "Chair",
+    "Coal",
+    "Fuel Canister",
+    "Oil Barrel",
+    "Biofuel"
+}
+
+local selectedFuels = {}
+
+
+Tabs.Bring:Dropdown({
+    Title = "Select fuel item",
+    Values = fuelItems,
+    Value = {},
+    Multi = true,
+    AllowNone = true,
+    Callback = function(Selected)
+        selectedFuels = Selected or {}
+    end
+})
+
+
+Tabs.Bring:Button({
+    Title = "Auto bring fuel item",
+    Callback = function()
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+
+        for _, item in pairs(Workspace.Items:GetChildren()) do
+            if item:IsA("Model") and table.find(selectedFuels, item.Name) then
+                local main = item:FindFirstChildWhichIsA("BasePart")
+                if main then
+     
+                    main.CFrame = root.CFrame * CFrame.new(math.random(-5,5), 0, math.random(-5,5))
+                end
+            end
+        end
+    end
+})
+
+
+Tabs.Bring:Section({Title = "Food item"})
+
+
+
+
+
+local foodItems = {
+    "Carrot",
+    "Berry",
+    "Morsel",
+    "Steak",
+    "Cooked Morsel",
+    "Cooked Steak"
+}
+
+local selectedfood = {}
+
+
+
+
+Tabs.Bring:Dropdown({
+    Title = "Select food item",
+    Values = foodItems,
+    Value = {},
+    Multi = true,
+    AllowNone = true,
+    Callback = function(Selectedfood)
+        selectedfood = Selectedfood or {}
+    end
+})
+
+
+Tabs.Bring:Button({
+    Title = "Auto bring food item",
+    Callback = function()
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+
+        for _, item in pairs(Workspace.Items:GetChildren()) do
+            if item:IsA("Model") and table.find(selectedfood, item.Name) then
+                local main = item:FindFirstChildWhichIsA("BasePart")
+                if main then
+     
+                    main.CFrame = root.CFrame * CFrame.new(math.random(-5,5), 0, math.random(-5,5))
+                end
+            end
+        end
+    end
+})
+
+Tabs.Bring:Section({Title = "Gun item"})
+
+
+
+local gunItems = {
+    "Revolver",
+    "Rifle",
+    "Revolver Ammo",
+    "Rifle Ammo",
+    "Leather Body",
+    "Iron Body",
+    "Thorn Body"
+}
+
+local selectedgun = {}
+
+
+
+
+Tabs.Bring:Dropdown({
+    Title = "Select gun item",
+    Values = gunItems,
+    Value = {},
+    Multi = true,
+    AllowNone = true,
+    Callback = function(Selectedgun)
+        selectedgun = Selectedgun or {}
+    end
+})
+
+
+Tabs.Bring:Button({
+    Title = "Auto bring gun item",
+    Callback = function()
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+
+        for _, item in pairs(Workspace.Items:GetChildren()) do
+            if item:IsA("Model") and table.find(selectedgun, item.Name) then
+                local main = item:FindFirstChildWhichIsA("BasePart")
+                if main then
+     
+                    main.CFrame = root.CFrame * CFrame.new(math.random(-5,5), 0, math.random(-5,5))
+                end
+            end
+        end
+    end
+})
+
+
+
+Tabs.Bring:Section({Title = "Crafting item"})
+
+
+
+
+
+
+local craftingItems = {
+    "Bolt",
+    "Sheet Metal",
+    "Old Radio",
+    "Broken Fan",
+    "Broken Microwave"
+}
+
+local selectedcrafting = {}
+
+
+
+
+Tabs.Bring:Dropdown({
+    Title = "Select crafting item",
+    Values = craftingItems,
+    Value = {},
+    Multi = true,
+    AllowNone = true,
+    Callback = function(Selectedcrafting)
+        selectedcrafting = Selectedcrafting or {}
+    end
+})
+
+
+Tabs.Bring:Button({
+    Title = "Auto bring crafting item",
+    Callback = function()
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+
+        for _, item in pairs(Workspace.Items:GetChildren()) do
+            if item:IsA("Model") and table.find(selectedcrafting, item.Name) then
+                local main = item:FindFirstChildWhichIsA("BasePart")
+                if main then
+     
+                    main.CFrame = root.CFrame * CFrame.new(math.random(-5,5), 0, math.random(-5,5))
+                end
+            end
+        end
+    end
+})
+
+
+
+
+
+
+Tabs.Bring:Section({Title = "Healing item"})
+
+
+
+
+
+
+local healingItems = {
+    "Bandage",
+    "MedKit"
+}
+
+local selectedhealing = {}
+
+
+
+
+Tabs.Bring:Dropdown({
+    Title = "Select healing item",
+    Values = healingItems,
+    Value = {},
+    Multi = true,
+    AllowNone = true,
+    Callback = function(Selectedhealing)
+        selectedhealing = Selectedhealing or {}
+    end
+})
+
+
+Tabs.Bring:Button({
+    Title = "Auto bring healing item",
+    Callback = function()
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+
+        for _, item in pairs(Workspace.Items:GetChildren()) do
+            if item:IsA("Model") and table.find(selectedhealing, item.Name) then
+                local main = item:FindFirstChildWhichIsA("BasePart")
+                if main then
+     
+                    main.CFrame = root.CFrame * CFrame.new(math.random(-5,5), 0, math.random(-5,5))
+                end
+            end
+        end
+    end
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Tabs.Esp:Section({Title = "Player"})
+
+
+local ESP = loadstring(game:HttpGet("https://kiriot22.com/releases/ESP.lua"))()
+ESP:Toggle(true)
+ESP.Players = false
+ESP.Tracers = false
+ESP.Boxes = false
+ESP.Names = false
+ESP.TeamColor = false
+
+
+
+
+
+
+
+
+
+Tabs.Esp:Toggle({
+    Title = "Esp enabled",
+    Value = false, 
+    Callback = function(Value)
+    ESP.Players = Value
+    end
+    })
+
+
+Tabs.Esp:Toggle({
+    Title = "Esp name",
+    Value = false, 
+    Callback = function(Value)
+    ESP.Names = Value
+    end
+    })
+    
+    
+    
+    Tabs.Esp:Toggle({
+    Title = "Esp box",
+    Value = false, 
+    Callback = function(Value)
+    ESP.Boxes = Value
+    end
+    })
+    
+    
+    Tabs.Esp:Toggle({
+    Title = "Esp tracer",
+    Value = false, 
+    Callback = function(Value)
+    ESP.Tracers = Value
+    end
+    })
+    
+
+
+
+
+
+Tabs.Teleport:Button({
+    Title = "Teleport to camp",
+    Callback = function()
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            char.HumanoidRootPart.CFrame = CFrame.new(
+                13.287363052368164, 3.999999761581421, 0.36212217807769775,
+                0.6022269129753113, -2.275036159460342e-08, 0.7983249425888062,
+                6.430457055728311e-09, 1, 2.364672191390582e-08,
+                -0.7983249425888062, -9.1070981866892e-09, 0.6022269129753113
+            )
+        end
+    end
+})
+
+
+Tabs.Teleport:Button({
+    Title = "Teleport to trader",
+    Callback = function()
+        local pos = Vector3.new(-37.08, 3.98, -16.33)
+        local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local hrp = character:WaitForChild("HumanoidRootPart")
+        hrp.CFrame = CFrame.new(pos)
+    end
+})
+
+Tabs.Teleport:Button({
+    Title = "Teleport random chest",
+    Callback = function()
+local chests = {}
+for _, obj in pairs(Workspace:WaitForChild("Items"):GetChildren()) do
+    if obj.Name:match("^Item Chest2?$") then
+        table.insert(chests, obj)
+    end
+end
+if #chests > 0 and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+    local chosen = chests[math.random(1, #chests)]
+    local root = LocalPlayer.Character.HumanoidRootPart
+    local targetPos = chosen:FindFirstChildWhichIsA("BasePart") or chosen:FindFirstChild("ChestLid")
+    
+    if targetPos then
+        local offset = Vector3.new(math.random(-3, 3), 5, math.random(-3, 3)) 
+        root.CFrame = CFrame.new(targetPos.Position + offset)
+    end
+end
+    end
+})
+
+
+
+Tabs.Teleport:Button({
+    Title = "Teleport main game",
+    Callback = function()
+        local TeleportService = game:GetService('TeleportService')
+				GameId = 79546208627805
+				TeleportService:Teleport(GameId, game.Players.LocalPlayer)
+    end
+})
