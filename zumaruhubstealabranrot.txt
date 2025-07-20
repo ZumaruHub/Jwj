@@ -1,3 +1,75 @@
+-- Tạo ScreenGui
+local sg = Instance.new("ScreenGui")
+sg.Name = "KeySystem"
+sg.ResetOnSpawn = false
+
+-- Tạo Frame
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 200)
+frame.Position = UDim2.new(0.5, -150, 0.5, -100)
+frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+frame.BorderSizePixel = 0
+frame.Parent = sg
+
+-- Tiêu đề
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 40)
+title.BackgroundTransparency = 1
+title.Text = "🔑 Key System"
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 24
+title.TextColor3 = Color3.fromRGB(255,255,255)
+title.Parent = frame
+
+-- TextBox nhập key
+local box = Instance.new("TextBox")
+box.Size = UDim2.new(1, -40, 0, 40)
+box.Position = UDim2.new(0, 20, 0, 60)
+box.PlaceholderText = "Nhập key..."
+box.Font = Enum.Font.SourceSans
+box.TextSize = 20
+box.BackgroundColor3 = Color3.fromRGB(60,60,60)
+box.TextColor3 = Color3.fromRGB(255,255,255)
+box.Parent = frame
+
+-- Nút GetKey
+local getKey = Instance.new("TextButton")
+getKey.Size = UDim2.new(0, 80, 0, 30)
+getKey.Position = UDim2.new(0, 20, 1, -40)
+getKey.Text = "GetKey"
+getKey.BackgroundColor3 = Color3.fromRGB(0,170,255)
+getKey.TextColor3 = Color3.fromRGB(255,255,255)
+getKey.Font = Enum.Font.SourceSansBold
+getKey.TextSize = 18
+getKey.Parent = frame
+
+-- Nút Submit
+local submit = Instance.new("TextButton")
+submit.Size = UDim2.new(0, 80, 0, 30)
+submit.Position = UDim2.new(0.5, -40, 1, -40)
+submit.Text = "Submit"
+submit.BackgroundColor3 = Color3.fromRGB(0,200,100)
+submit.TextColor3 = Color3.fromRGB(255,255,255)
+submit.Font = Enum.Font.SourceSansBold
+submit.TextSize = 18
+submit.Parent = frame
+
+-- Nút Exit
+local exit = Instance.new("TextButton")
+exit.Size = UDim2.new(0, 80, 0, 30)
+exit.Position = UDim2.new(1, -100, 1, -40)
+exit.Text = "Exit"
+exit.BackgroundColor3 = Color3.fromRGB(200,50,50)
+exit.TextColor3 = Color3.fromRGB(255,255,255)
+exit.Font = Enum.Font.SourceSansBold
+exit.TextSize = 18
+exit.Parent = frame
+
+-- Thêm ScreenGui vào PlayerGui
+sg.Parent = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+
+-- Function để load main hub
+local function loadMainHub()
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 
 local Window = Fluent:CreateWindow({
@@ -16,6 +88,28 @@ local Tabs = {
     Visual = Window:AddTab({ Title = "Visual", Icon = "compass" }),
     Misc = Window:AddTab({ Title = "Misc", Icon = "settings" }),
 }
+
+local function createMobileButton()
+        local ScreenGui = Instance.new("ScreenGui")
+        local ImageButton = Instance.new("ImageButton")
+        local UICorner = Instance.new("UICorner")
+        
+        ScreenGui.Parent = game.CoreGui
+        ImageButton.Parent = ScreenGui
+        ImageButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        ImageButton.Position = UDim2.new(0.12, 0, 0.095, 0)
+        ImageButton.Size = UDim2.new(0, 50, 0, 50)
+        ImageButton.Draggable = true
+        ImageButton.Image = "http://www.roblox.com/asset/?id=131514592839954"
+        
+        UICorner.CornerRadius = UDim.new(0, 10)
+        UICorner.Parent = ImageButton
+        
+        ImageButton.MouseButton1Down:Connect(function()
+            game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.LeftControl, false, game)
+        end)
+    end
+    createMobileButton()
 
 -- Services
 local Players = game:GetService("Players")
@@ -742,3 +836,43 @@ Tabs.Misc:AddButton({
 
 -- Initialize
 Window:SelectTab(1)
+-- Sự kiện nút GetKey
+
+getKey.MouseButton1Click:Connect(function()
+    if setclipboard then
+        setclipboard("https://discord.gg/ARBJ4kGPKj")
+        game.StarterGui:SetCore("SendNotification",{
+            Title="✅ GetKey";
+            Text="Đã sao chép link Discord!";
+            Duration=3;
+        })
+    else
+        warn("Executor không hỗ trợ setclipboard.")
+    end
+end)
+
+-- Sự kiện nút Submit
+submit.MouseButton1Click:Connect(function()
+    if box.Text == "ZUMARU-UDHANU" then
+        game.StarterGui:SetCore("SendNotification",{
+            Title="✅ Đúng Key";
+            Text="Đang mở khóa...";
+            Duration=3;
+        })
+        sg:Destroy() -- tắt UI Key System
+        
+        -- Load main hub chỉ khi key đúng
+        loadMainHub()
+    else
+        game.StarterGui:SetCore("SendNotification",{
+            Title="❌ Sai Key";
+            Text="Hãy thử lại!";
+            Duration=3;
+        })
+    end
+end)
+
+-- Sự kiện nút Exit
+exit.MouseButton1Click:Connect(function()
+    sg:Destroy()
+end)
