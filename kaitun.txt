@@ -1,0 +1,538 @@
+-- Kaitun Clean Optimized Script for Roblox Executor
+-- Optimized for performance and compatibility
+-- Ensure executor supports getgenv(), Drawing, and HttpGet
+
+-- Configuration
+getgenv().Config = {
+    ["Enable Screen Black"] = false,
+    ["Screen Black FPS Cap"] = 30,
+    ["Buy Seeds"] = {
+        Enabled = true,
+        Threshold = 10,
+        Item = {
+            Carrot = true, Strawberry = true, Blueberry = true, ["Orange Tulip"] = true,
+            Tomato = true, Corn = true, Daffodil = true, Watermelon = true,
+            Pumpkin = true, Apple = true, Bamboo = true, Coconut = true,
+            Cactus = true, ["Dragon Fruit"] = true, Mango = true, Grape = true,
+            Mushroom = true, Pepper = true, Cacao = true, Beanstalk = true,
+            ["Ember Lily"] = true, ["Sugar Apple"] = true
+        }
+    },
+    ["Buy Tools"] = {
+        Enabled = true,
+        Threshold = 10000000,
+        Item = {
+            ["Watering Can"] = true, Trowel = true, ["Godly Sprinkler"] = true,
+            ["Lightning Rod"] = true, ["Friendship Pot"] = true, ["Cleaning Spray"] = true
+        }
+    },
+    ["Buy Eggs"] = {
+        Enabled = true,
+        Threshold = 10000000,
+        Item = { ["Bug Egg"] = true }
+    },
+    ["Buy Events"] = {
+        Enabled = true,
+        Item = {
+            ["Flower Seed Pack"] = true, Nectarine = true, ["Hive Fruit"] = true,
+            ["Honey Sprinkler"] = true, ["Bee Egg"] = true
+        }
+    },
+    ["Use Sprinklers"] = {
+        Enabled = true,
+        Sprinkler = {
+            ["Basic Sprinkler"] = true, ["Advanced Sprinkler"] = true,
+            ["Godly Sprinkler"] = true, ["Master Sprinkler"] = true
+        },
+        Stack = {
+            ["Basic Sprinkler"] = false, ["Advanced Sprinkler"] = false,
+            ["Godly Sprinkler"] = false, ["Master Sprinkler"] = false
+        }
+    },
+    ["Use Pets"] = {
+        Enabled = true,
+        ["Pet Name"] = { "Golden Lab" },
+        ["Pet Rarity"] = {
+            { Common = true }, { Uncommon = true }, { Rare = true },
+            { Legendary = true }, { Mythical = true }, { Divine = true }
+        }
+    },
+    ["Dont Collect On Weather"] = {
+        Enabled = true,
+        Weather = { RainEvent = false, FrostEvent = true, Thunderstorm = true, BeeSwarm = false }
+    },
+    ["Dont Buy Seed"] = {
+        ["If Money More Than"] = 1000000,
+        ["Seed Name"] = { "Strawberry", "Blueberry", "Tomato", "Corn", "Apple", "Carrot" }
+    },
+    ["Dont Plant Inventory Seed"] = {
+        Enabled = false,
+        ["Seed Name"] = { "Strawberry", "Blueberry", "Tomato", "Corn", "Apple", "Carrot", "Rose" }
+    },
+    ["Delete Planted Seed"] = {
+        Enabled = true,
+        Slot = {
+            { slot = 300, min = 0 }, { slot = 200, min = 1000000 },
+            { slot = 150, min = 10000000 }, { slot = 100, min = 20000000 },
+            { slot = 50, min = 100000000 }
+        },
+        ["Name Seed Delete"] = { "Strawberry", "Blueberry", "Tomato", "Corn", "Apple", "Rose", "Foxglove", "Orange Tulip" },
+        ["Auto Rejoin"] = { Enabled = true, Delay = 5 }
+    },
+    ["ESP"] = { Egg = true, Player = true, Pollinated = true }
+}
+
+-- Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local CollectionService = game:GetService("CollectionService")
+local TeleportService = game:GetService("TeleportService")
+local VirtualUser = game:GetService("VirtualUser")
+local Player = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
+
+-- Prevent script from running multiple times
+if getgenv().kaitun and getgenv().kaitun.loaded then return end
+getgenv().kaitun = { loaded = true }
+
+-- Task Manager (Simplified)
+local TaskManager = {
+    tasks = {},
+    register = function(self, isPriority, name, priority)
+        self.tasks[name] = { isPriority = isPriority, priority = priority or 50, func = nil }
+    end,
+    normal = function(self, name, func, args, condition)
+        if self.tasks[name] and condition() then
+            self.tasks[name].func = func
+            self.tasks[name].args = args
+            coroutine.wrap(func)(unpack(args))
+        end
+    end,
+    priority = function(self, name, func, args, condition)
+        if self.tasks[name] and condition() then
+            self.tasks[name].func = func
+            self.tasks[name].args = args
+            coroutine.wrap(func)(unpack(args))
+        end
+    end
+}
+local manager = TaskManager
+manager:register(true, "BalancerPlant", "high")
+manager:register(false, "GivePollinateFruit", 80)
+manager:register(false, "AutoPlaceEgg", 75)
+manager:register(false, "DestroyPlant", 74)
+manager:register(false, "PlaceSprinkler", 73)
+manager:register(false, "AutoPlanting", 72)
+manager:register(false, "OpenSeedPack", 71)
+manager:register(false, "FeedPet", 69)
+manager:register(false, "AutoSelling", 68)
+manager:register(false, "AutoHarvesting", 65)
+
+-- Anti-AFK
+Player.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+end)
+
+-- Game Settings
+local settings = {
+    game = {
+        npcs = {
+            Eloise = Workspace.NPCS:FindFirstChild("Eloise") and Workspace.NPCS.Eloise.HumanoidRootPart.Position or nil,
+            Steven = Workspace.NPCS:FindFirstChild("Steven") and Workspace.NPCS.Steven.HumanoidRootPart.Position or nil
+        },
+        seeds = { normal = { "Carrot", "Strawberry", "Blueberry", "Orange Tulip", "Tomato", "Corn", "Daffodil", "Watermelon", "Pumpkin", "Apple", "Bamboo", "Coconut", "Cactus", "Dragon Fruit", "Mango", "Grape", "Mushroom", "Pepper", "Cacao", "Beanstalk", "Ember Lily", "Sugar Apple" },
+                  event = { "Flower Seed Pack", "Nectarine", "Hive Fruit", "Pollen Radar" } },
+        tools = { normal = { "Watering Can", "Trowel", "Godly Sprinkler", "Lightning Rod", "Friendship Pot", "Cleaning Spray" },
+                  event = { "Honey Sprinkler" } },
+        eggs = { normal = { "Bug Egg" }, event = { "Bee Egg" } }
+    },
+    player = { Sheckles = nil, Farm = nil, PlaceEgg = {}, FavoriteFruit = {}, Trigger = { isBuySeeds = false, isBuyTools = false, isBuyEggs = false }, isSelling = false }
+}
+
+-- Helper Functions
+local function teleport(position)
+    local char = Player.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        char.HumanoidRootPart.CFrame = CFrame.new(position + Vector3.new(0, 0.5, 0))
+    end
+end
+
+local function getFarm()
+    for _, farm in ipairs(Workspace:WaitForChild("Farm"):GetChildren()) do
+        local success, owner = pcall(function()
+            return farm:WaitForChild("Important").Data.Owner.Value
+        end)
+        if success and owner == Player.Name then return farm end
+    end
+    return nil
+end
+
+local function collectInventory()
+    local all = {}
+    for _, container in ipairs({ Player.Backpack, Player.Character }) do
+        if container then
+            for _, tool in ipairs(container:GetChildren()) do
+                if tool:IsA("Tool") then table.insert(all, tool) end
+            end
+        end
+    end
+    return all
+end
+
+local function removeFirstFruitByName(fruitName)
+    local farm = getFarm()
+    local plants = farm and farm:WaitForChild("Important"):FindFirstChild("Plants_Physical")
+    if plants then
+        for _, plant in ipairs(plants:GetChildren()) do
+            if plant.Name == fruitName then
+                local fruitPart = plant:FindFirstChildWhichIsA("BasePart")
+                if fruitPart then
+                    ReplicatedStorage.GameEvents.Remove_Item:FireServer(fruitPart)
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function filterByConfig(category, subcategory)
+    local list = settings.game[category]
+    local configKey = "Buy " .. category:sub(1,1):upper() .. category:sub(2)
+    local configItems = Config[configKey] and Config[configKey].Item
+    if not configItems or type(list) ~= "table" then return end
+    local newList = {}
+    for _, item in ipairs(list[subcategory]) do
+        if configItems[item] then table.insert(newList, item) end
+    end
+    list[subcategory] = newList
+end
+
+-- Apply Low Graphics Mode
+local function ApplyLowGraphicsMode()
+    local Lighting = game:GetService("Lighting")
+    pcall(function()
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 1e10
+        for _, v in ipairs(Lighting:GetChildren()) do
+            if v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("BloomEffect") or v:IsA("ColorCorrectionEffect") then
+                v:Destroy()
+            end
+        end
+    end)
+end
+
+-- Initialize
+ApplyLowGraphicsMode()
+settings.player.Farm = getFarm()
+filterByConfig("seeds", "normal")
+filterByConfig("tools", "normal")
+filterByConfig("eggs", "normal")
+
+-- Auto Buy Seeds
+task.spawn(function()
+    while task.wait(1) do
+        pcall(function()
+            if not Config["Buy Seeds"].Enabled or not settings.player.Trigger.isBuySeeds then return end
+            local data = require(ReplicatedStorage.Modules.DataService).GetData()
+            local remote = ReplicatedStorage.GameEvents.BuySeedStock
+            for _, itemName in ipairs(settings.game.seeds.normal) do
+                local stockData = data.SeedStock.Stocks[itemName]
+                if stockData and stockData.Stock > 0 then
+                    for _ = 1, stockData.Stock do
+                        remote:FireServer(itemName)
+                        task.wait(0.1)
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+-- Auto Buy Tools
+task.spawn(function()
+    while task.wait(5) do
+        pcall(function()
+            if not Config["Buy Tools"].Enabled or not settings.player.Trigger.isBuyTools then return end
+            local data = require(ReplicatedStorage.Modules.DataService).GetData()
+            local remote = ReplicatedStorage.GameEvents.BuyGearStock
+            for _, itemName in ipairs(settings.game.tools.normal) do
+                local stockData = data.GearStock.Stocks[itemName]
+                if stockData and stockData.Stock > 0 then
+                    for _ = 1, stockData.Stock do
+                        remote:FireServer(itemName)
+                        task.wait(0.1)
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+-- Auto Buy Eggs
+task.spawn(function()
+    while task.wait(5) do
+        pcall(function()
+            if not Config["Buy Eggs"].Enabled or not settings.player.Trigger.isBuyEggs then return end
+            local data = require(ReplicatedStorage.Modules.DataService).GetData()
+            local remote = ReplicatedStorage.GameEvents.BuyPetEgg
+            for index, eggData in pairs(data.PetEggStock.Stocks) do
+                if eggData and eggData.Stock > 0 then
+                    for _, name in ipairs(settings.game.eggs.normal) do
+                        if eggData.EggName == name then
+                            remote:FireServer(index)
+                            task.wait(0.1)
+                            break
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+-- Auto Plant
+task.spawn(function()
+    while task.wait(1) do
+        pcall(function()
+            local farm = settings.player.Farm
+            if not farm then return end
+            local seeds = {}
+            for _, tool in ipairs(collectInventory()) do
+                if tool:GetAttribute("ItemType") == "Seed" and not (Config["Dont Plant Inventory Seed"].Enabled and table.find(Config["Dont Plant Inventory Seed"]["Seed Name"], tool:GetAttribute("ItemName"))) then
+                    table.insert(seeds, tool)
+                end
+            end
+            if #seeds > 0 and #farm:WaitForChild("Important").Objects_Physical:GetChildren() < 800 then
+                for _, seed in ipairs(seeds) do
+                    Player.Character.Humanoid:EquipTool(seed)
+                    task.wait(0.01)
+                    local quantity = tonumber(seed.Name:match("%[x(%d+)%]")) or 1
+                    for _ = 1, quantity do
+                        local pos = farm:WaitForChild("Important").Plant_Locations.Can_Plant.Position
+                        local plantPos = Vector3.new(pos.X + math.random(-5, 5)/100, pos.Y, pos.Z + math.random(-5, 5)/100)
+                        ReplicatedStorage.GameEvents.Plant_RE:FireServer(plantPos, seed.Name:gsub(" Seed.*", ""))
+                        task.wait(0.01)
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+-- Auto Harvest
+task.spawn(function()
+    while task.wait(1) do
+        pcall(function()
+            if Config["Dont Collect On Weather"].Enabled then
+                for weather, active in pairs(Config["Dont Collect On Weather"].Weather) do
+                    if Workspace:GetAttribute(weather) and active then return end
+                end
+            end
+            local farm = settings.player.Farm
+            if not farm then return end
+            local isHarvesting = false
+            for _, plant in ipairs(farm:WaitForChild("Important").Plants_Physical:GetChildren()) do
+                for _, descendant in ipairs(plant:GetDescendants()) do
+                    if descendant:IsA("ProximityPrompt") and descendant.Enabled then
+                        isHarvesting = true
+                        break
+                    end
+                end
+                if isHarvesting then break end
+            end
+            if isHarvesting then
+                manager:normal("AutoHarvesting", function()
+                    for _, plant in ipairs(farm:WaitForChild("Important").Plants_Physical:GetChildren()) do
+                        for _, descendant in ipairs(plant:GetDescendants()) do
+                            if settings.player.isSelling then return end
+                            if descendant:IsA("ProximityPrompt") and descendant.Enabled then
+                                local part = descendant.Parent
+                                if part and part:IsA("BasePart") then
+                                    teleport(part.Position)
+                                    task.wait(0.05)
+                                    fireproximityprompt(descendant)
+                                    task.wait(0.1)
+                                end
+                            end
+                        end
+                    end
+                    settings.player.isSelling = true
+                end, {settings}, function() return true end)
+            end
+        end)
+    end
+end)
+
+-- Auto Sell
+task.spawn(function()
+    while task.wait(1) do
+        pcall(function()
+            if not settings.player.isSelling then return end
+            manager:normal("AutoSelling", function()
+                teleport(settings.game.npcs.Steven)
+                task.wait(0.5)
+                ReplicatedStorage.GameEvents.Sell_Inventory:FireServer()
+                task.wait(2)
+                settings.player.isSelling = false
+            end, {settings}, function() return true end)
+        end)
+    end
+end)
+
+-- Auto Remove Plants
+task.spawn(function()
+    while task.wait(5) do
+        pcall(function()
+            local farm = settings.player.Farm
+            if not farm then return end
+            local plants = farm:WaitForChild("Important").Plants_Physical:GetChildren()
+            local isPlanted = false
+            for _, name in ipairs(Config["Delete Planted Seed"]["Name Seed Delete"]) do
+                if farm:WaitForChild("Important").Plants_Physical:FindFirstChild(name) then
+                    isPlanted = true
+                    break
+                end
+            end
+            if isPlanted then
+                local sheckles = settings.player.Sheckles or Player.leaderstats.Sheckles.Value
+                local selectedSlot, maxMin = nil, -math.huge
+                for _, slot in ipairs(Config["Delete Planted Seed"].Slot) do
+                    if sheckles >= slot.min and slot.min > maxMin then
+                        selectedSlot = slot.slot
+                        maxMin = slot.min
+                    end
+                end
+                local overCount = #plants - selectedSlot
+                if overCount > 0 then
+                    manager:normal("DestroyPlant", function()
+                        local shovel = Player.Backpack:FindFirstChild("Shovel [Destroy Plants]") or Player.Character:FindFirstChild("Shovel [Destroy Plants]")
+                        if shovel then Player.Character.Humanoid:EquipTool(shovel) task.wait(1) end
+                        for _, name in ipairs(Config["Delete Planted Seed"]["Name Seed Delete"]) do
+                            if overCount < 1 then break end
+                            for _ = 1, overCount do
+                                if removeFirstFruitByName(name) then
+                                    task.wait(0.1)
+                                    overCount = overCount - 1
+                                else
+                                    break
+                                end
+                            end
+                        end
+                    end, {overCount}, function() return true end)
+                end
+            end
+        end)
+    end
+end)
+
+-- ESP (Drawing Library)
+local DrawingCache = {}
+local function createESP(id, text, color)
+    if DrawingCache[id] then return end
+    local label = Drawing.new("Text")
+    label.Text = text
+    label.Size = 18
+    label.Color = color
+    label.Center = true
+    label.Outline = true
+    label.Visible = true
+    DrawingCache[id] = { label = label }
+end
+
+local function removeESP(id)
+    if DrawingCache[id] then
+        DrawingCache[id].label:Remove()
+        DrawingCache[id] = nil
+    end
+end
+
+if Config.ESP.Player then
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= Player and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            createESP("player_" .. plr.Name, plr.Name, Color3.fromRGB(255, 255, 0))
+        end
+    end
+    Players.PlayerAdded:Connect(function(plr)
+        plr.CharacterAdded:Connect(function()
+            task.wait(1)
+            if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                createESP("player_" .. plr.Name, plr.Name, Color3.fromRGB(255, 255, 0))
+            end
+        end)
+    end)
+    Players.PlayerRemoving:Connect(function(plr)
+        removeESP("player_" .. plr.Name)
+    end)
+end
+
+if Config.ESP.Pollinated then
+    for _, plant in ipairs(CollectionService:GetTagged("Plant")) do
+        if plant:GetAttribute("Pollinated") then
+            createESP("plant_" .. plant:GetDebugId(), "Pollinated", Color3.fromRGB(255, 105, 180))
+        end
+    end
+    CollectionService:GetInstanceAddedSignal("Plant"):Connect(function(plant)
+        if plant:GetAttribute("Pollinated") then
+            createESP("plant_" .. plant:GetDebugId(), "Pollinated", Color3.fromRGB(255, 105, 180))
+        end
+    end)
+    CollectionService:GetInstanceRemovedSignal("Plant"):Connect(function(plant)
+        removeESP("plant_" .. plant:GetDebugId())
+    end)
+end
+
+RunService.RenderStepped:Connect(function()
+    for id, data in pairs(DrawingCache) do
+        local instance
+        if id:sub(1, 7) == "player_" then
+            local plr = Players:FindFirstChild(id:sub(8))
+            if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                instance = plr.Character.HumanoidRootPart
+            end
+        elseif id:sub(1, 6) == "plant_" then
+            for _, plant in ipairs(CollectionService:GetTagged("Plant")) do
+                if "plant_" .. plant:GetDebugId() == id then
+                    instance = plant
+                    break
+                end
+            end
+        end
+        if instance then
+            local pos, onScreen = Workspace.CurrentCamera:WorldToViewportPoint(instance:GetPivot().Position)
+            data.label.Position = Vector2.new(pos.X, pos.Y - 20)
+            data.label.Visible = onScreen
+        else
+            data.label.Visible = false
+        end
+    end
+end)
+
+-- Auto Rejoin
+if Config["Delete Planted Seed"]["Auto Rejoin"].Enabled then
+    Players.LocalPlayer.OnTeleport:Connect(function(state)
+        if state == Enum.TeleportState.Failed or state == Enum.TeleportState.RequestRejected then
+            task.wait(Config["Delete Planted Seed"]["Auto Rejoin"].Delay)
+            TeleportService:Teleport(game.PlaceId, Player)
+        end
+    end)
+    game:GetService("CoreGui").RobloxPromptGui.promptOverlay.ChildAdded:Connect(function(child)
+        if child.Name == "ErrorPrompt" then
+            task.wait(Config["Delete Planted Seed"]["Auto Rejoin"].Delay)
+            TeleportService:Teleport(game.PlaceId, Player)
+        end
+    end)
+end
+
+-- Update Player Data
+task.spawn(function()
+    while task.wait(1) do
+        settings.player.Sheckles = Player:WaitForChild("leaderstats").Sheckles.Value
+        settings.player.Farm = getFarm()
+    end
+end)
+
+-- Ensure Game Loaded
+repeat task.wait() until game:IsLoaded()
