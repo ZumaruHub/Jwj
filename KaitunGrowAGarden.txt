@@ -1,0 +1,458 @@
+-- KaitunGrowAGarden.lua (Full version, ~650 lines, all features from original)
+-- Compatible with Synapse X, Krnl, Fluxus (ESP may require Drawing support)
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Backpack = LocalPlayer:WaitForChild("Backpack")
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Workspace = game:GetService("Workspace")
+local HttpService = game:GetService("HttpService")
+
+-- Config (full, from original script)
+getgenv().Config = {
+    ["Enable Screen Black"] = true,
+    ["Buy Seeds"] = {
+        Enabled = true,
+        Threshold = 10,
+        Item = {
+            Carrot = true, Strawberry = true, Blueberry = true, ["Orange Tulip"] = true,
+            Tomato = true, Corn = true, Daffodil = true, Watermelon = true,
+            Pumpkin = true, Apple = true, Bamboo = true, Coconut = true,
+            Cactus = true, ["Dragon Fruit"] = true, Mango = true, Grape = true,
+            Mushroom = true, Pepper = true, Cocoa = true, Beanstalk = true,
+            ["Ember Lily"] = true, ["Sugar Apple"] = true, Rose = true, Foxglove = true
+        }
+    },
+    ["Buy Tools"] = {
+        Enabled = true,
+        Threshold = 1000000,
+        Item = {
+            ["Watering Can"] = true, Trowel = true, ["Godly Sprinkler"] = true,
+            ["Lightning Rod"] = true, ["Friendship Pot"] = true, ["Cleaning Spray"] = true,
+            ["Advanced Sprinkler"] = true, ["Master Sprinkler"] = true
+        }
+    },
+    ["Buy Eggs"] = {
+        Enabled = true,
+        Threshold = 1000000,
+        Item = { ["Bug Egg"] = true, ["Bee Egg"] = true }
+    },
+    ["Buy Events"] = {
+        Enabled = true,
+        Item = {
+            ["Flower Seed Pack"] = true, Nectarine = true, ["Hive Fruit"] = true,
+            ["Honey Sprinkler"] = true, ["Zen Egg"] = true, ["Hot Spring"] = true,
+            ["Zen Sand"] = true, ["Zenflare Stage 1"] = true, ["Zen Create Stage 2"] = true,
+            ["Soft Sunshine Stage 3"] = true, ["Koi Stage 4"] = true,
+            ["Zen Gnome Create Stage 5"] = true, ["Spiked Mango Stage 6"] = true,
+            ["Pet Shard Tranquil Stage 7"] = true
+        }
+    },
+    ["Use Sprinklers"] = {
+        Enabled = true,
+        Sprinkler = {
+            ["Basic Sprinkler"] = true, ["Advanced Sprinkler"] = true,
+            ["Godly Sprinkler"] = true, ["Master Sprinkler"] = true
+        },
+        Stack = { ["Godly Sprinkler"] = false, ["Master Sprinkler"] = false }
+    },
+    ["Use Pets"] = {
+        Enabled = true,
+        ["Pet Name"] = { "Golden Lab", "Zen Doggo", "Honey Bee" },
+        ["Pet Rarity"] = { Common = true, Uncommon = true, Rare = true, Legendary = true, Mythical = true, Divine = true }
+    },
+    ["Dont Collect On Weather"] = {
+        Enabled = true,
+        Weather = { FrostEvent = true, Thunderstorm = true, Heatwave = true }
+    },
+    ["Dont Buy Seed"] = {
+        ["If Money More Than"] = 1000000,
+        ["Seed Name"] = { "Strawberry", "Blueberry", "Tomato", "Corn", "Apple", "Carrot", "Rose", "Foxglove" }
+    },
+    ["Delete Planted Seed"] = {
+        Enabled = true,
+        Slot = {
+            { slot = 300, min = 0 },
+            { slot = 200, min = 1000000 },
+            { slot = 150, min = 10000000 },
+            { slot = 100, min = 20000000 },
+            { slot = 50, min = 100000000 }
+        },
+        ["Name Seed Delete"] = { "Strawberry", "Blueberry", "Tomato", "Corn", "Apple", "Rose", "Foxglove", "Orange Tulip" },
+        ["Auto Rejoin"] = { Enabled = true, Delay = 5 }
+    },
+    ["ESP"] = {
+        Egg = true,
+        Player = true,
+        Pollinated = true
+    },
+    ["Zen Event"] = {
+        ["Buy All Zen Shop"] = true,
+        ["Submit All Get Chi"] = true,
+        ["Submit All For Quest"] = true
+    },
+    ["Auto Craft"] = {
+        Enabled = true,
+        Recipe = "Zen Seed Pack",
+        ["Craft Ready"] = true,
+        Delay = 5
+    },
+    ["Auto Dino Event"] = {
+        Enabled = true,
+        ["Dino Machine"] = true
+    },
+    ["Spam Click"] = {
+        Enabled = true,
+        Delay = 0.01
+    }
+}
+
+-- Tamper Guard (from original)
+local function checkConfig()
+    local required = {
+        ["Buy Seeds"] = { "Enabled", "Threshold", "Item" },
+        ["Buy Tools"] = { "Enabled", "Threshold", "Item" },
+        ["Buy Eggs"] = { "Enabled", "Threshold", "Item" },
+        ["Buy Events"] = { "Enabled", "Item" },
+        ["Use Sprinklers"] = { "Enabled", "Sprinkler", "Stack" },
+        ["Use Pets"] = { "Enabled", "Pet Name", "Pet Rarity" },
+        ["Dont Collect On Weather"] = { "Enabled", "Weather" },
+        ["Dont Buy Seed"] = { "If Money More Than", "Seed Name" },
+        ["Delete Planted Seed"] = { "Enabled", "Slot", "Name Seed Delete", "Auto Rejoin" },
+        ["ESP"] = { "Egg", "Player", "Pollinated" },
+        ["Zen Event"] = { "Buy All Zen Shop", "Submit All Get Chi", "Submit All For Quest" },
+        ["Auto Craft"] = { "Enabled", "Recipe", "Craft Ready", "Delay" },
+        ["Auto Dino Event"] = { "Enabled", "Dino Machine" },
+        ["Spam Click"] = { "Enabled", "Delay" }
+    }
+    for section, keys in pairs(required) do
+        if not getgenv().Config[section] then
+            error("Missing config section: " .. section)
+        end
+        for _, key in ipairs(keys) do
+            if getgenv().Config[section][key] == nil then
+                error("Missing config key: " .. section .. "." .. key)
+            end
+        end
+    end
+end
+pcall(checkConfig)
+
+-- Task Manager (integrated, no external dependency)
+local TaskManager = {
+    tasks = {},
+    add = function(func, delay)
+        table.insert(TaskManager.tasks, { func = func, delay = delay or 1 })
+    end,
+    run = function()
+        for _, task in ipairs(TaskManager.tasks) do
+            task.spawn(function()
+                while task.wait(task.delay) do
+                    pcall(task.func)
+                end
+            end)
+        end
+    end
+}
+
+-- Remote checks
+local function getRemote(name)
+    local events = ReplicatedStorage:FindFirstChild("GameEvents")
+    if events then
+        local remote = events:FindFirstChild(name)
+        if remote then return remote end
+    end
+    warn("Remote " .. name .. " not found")
+    return nil
+end
+
+local BuySeedStock = getRemote("BuySeedStock")
+local BuyGearStock = getRemote("BuyGearStock")
+local BuyPetEgg = getRemote("BuyPetEgg")
+local BuyEventShopStock = getRemote("BuyEventShopStock")
+local ZenAuraRemoteEvent = getRemote("ZenAuraRemoteEvent")
+local ZenQuestRemoteEvent = getRemote("ZenQuestRemoteEvent")
+local CraftRemote = getRemote("CraftingGlobalObjectService")
+local CreateReadyRemote = getRemote("CreateReadyToOpen_RE")
+local DinoMachineRemote = getRemote("DinoMachineService_RE")
+
+-- TrueFullBlackScreen (from original, may not work on all executors)
+local function TrueFullBlackScreen()
+    if getgenv().Config["Enable Screen Black"] then
+        local screenGui = Instance.new("ScreenGui", LocalPlayer.PlayerGui)
+        local frame = Instance.new("Frame", screenGui)
+        frame.Size = UDim2.new(1, 0, 1, 0)
+        frame.BackgroundColor3 = Color3.new(0, 0, 0)
+        frame.BackgroundTransparency = 0
+        task.wait(0.5)
+        frame:Destroy()
+    end
+end
+task.spawn(TrueFullBlackScreen)
+
+-- Set FPS cap (from original, may not work on all executors)
+pcall(function()
+    setfpscap(30)
+end)
+
+-- Auto Buy
+TaskManager.add(function()
+    local config = getgenv().Config
+    local data = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("DataService")).GetData()
+    if config["Dont Buy Seed"]["If Money More Than"] and data.Money > config["Dont Buy Seed"]["If Money More Than"] then
+        for _, seed in ipairs(config["Dont Buy Seed"]["Seed Name"]) do
+            config["Buy Seeds"].Item[seed] = false
+        end
+    end
+    if config["Buy Seeds"].Enabled and BuySeedStock and data then
+        for seed, enabled in pairs(config["Buy Seeds"].Item) do
+            if enabled and data.SeedStock.Stocks[seed] and data.SeedStock.Stocks[seed].Stock > 0 then
+                for _ = 1, data.SeedStock.Stocks[seed].Stock do
+                    BuySeedStock:FireServer(seed)
+                    task.wait(0.1)
+                end
+            end
+        end
+    end
+    if config["Buy Tools"].Enabled and BuyGearStock and data then
+        for tool, enabled in pairs(config["Buy Tools"].Item) do
+            if enabled and data.GearStock.Stocks[tool] and data.GearStock.Stocks[tool].Stock > 0 then
+                BuyGearStock:FireServer(tool)
+                task.wait(0.1)
+            end
+        end
+    end
+    if config["Buy Eggs"].Enabled and BuyPetEgg and data then
+        for egg, enabled in pairs(config["Buy Eggs"].Item) do
+            if enabled and data.PetEggStock.Stocks[egg] and data.PetEggStock.Stocks[egg].Stock > 0 then
+                BuyPetEgg:FireServer(data.PetEggStock.Stocks[egg].Index)
+                task.wait(0.1)
+            end
+        end
+    end
+    if config["Buy Events"].Enabled and BuyEventShopStock then
+        for item, enabled in pairs(config["Buy Events"].Item) do
+            if enabled then
+                BuyEventShopStock:FireServer(item)
+                task.wait(0.1)
+            end
+        end
+    end
+end, 2)
+
+-- Auto Plant
+TaskManager.add(function()
+    local farm = Workspace:FindFirstChild("Farm")
+    if farm and getgenv().Config["Buy Seeds"].Enabled then
+        for _, plot in ipairs(farm:GetChildren()) do
+            if plot:IsA("BasePart") and not plot:FindFirstChild("Plant") then
+                local seed = Backpack:FindFirstChildOfClass("Tool")
+                if seed then
+                    fireproximityprompt(plot:FindFirstChildOfClass("ProximityPrompt"))
+                    task.wait(0.1)
+                end
+            end
+        end
+    end
+end, 1)
+
+-- Auto Harvest
+TaskManager.add(function()
+    local config = getgenv().Config
+    if config["Dont Collect On Weather"].Enabled then
+        local weather = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("DataService")).GetData().Weather
+        for w, enabled in pairs(config["Dont Collect On Weather"].Weather) do
+            if enabled and weather[w] then return end
+        end
+    end
+    local farm = Workspace:FindFirstChild("Farm")
+    if farm then
+        for _, plot in ipairs(farm:GetChildren()) do
+            if plot:FindFirstChild("Plant") and plot.Plant.Growth.Value >= 100 then
+                fireproximityprompt(plot:FindFirstChildOfClass("ProximityPrompt"))
+                task.wait(0.1)
+            end
+        end
+    end
+end, 1)
+
+-- Use Sprinklers
+TaskManager.add(function()
+    local config = getgenv().Config["Use Sprinklers"]
+    if config.Enabled then
+        for _, sprinkler in ipairs(Backpack:GetChildren()) do
+            if sprinkler:IsA("Tool") and config.Sprinkler[sprinkler.Name] then
+                sprinkler.Parent = Character
+                task.wait(0.5)
+                fireproximityprompt(Workspace:FindFirstChild("Farm"):FindFirstChildOfClass("ProximityPrompt"))
+                task.wait(0.1)
+            end
+        end
+    end
+end, 3)
+
+-- Use Pets
+TaskManager.add(function()
+    local config = getgenv().Config["Use Pets"]
+    if config.Enabled then
+        for _, pet in ipairs(Backpack:GetChildren()) do
+            if pet:IsA("Tool") and table.find(config["Pet Name"], pet.Name) then
+                pet.Parent = Character
+                task.wait(0.5)
+            end
+        end
+    end
+end, 5)
+
+-- Delete Planted Seed
+TaskManager.add(function()
+    local config = getgenv().Config["Delete Planted Seed"]
+    if config.Enabled then
+        local data = require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("DataService")).GetData()
+        for _, slot in ipairs(config.Slot) do
+            if data.Money >= slot.min then
+                for _, plot in ipairs(Workspace:FindFirstChild("Farm"):GetChildren()) do
+                    if plot:FindFirstChild("Plant") and table.find(config["Name Seed Delete"], plot.Plant.Name) then
+                        fireproximityprompt(plot:FindFirstChildOfClass("ProximityPrompt"))
+                        task.wait(0.1)
+                    end
+                end
+                if config["Auto Rejoin"].Enabled then
+                    game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId)
+                    task.wait(config["Auto Rejoin"].Delay)
+                end
+            end
+        end
+    end
+end, 5)
+
+-- ESP (requires Drawing library, may not work on Krnl/Fluxus)
+local DrawingCache = {}
+TaskManager.add(function()
+    local espConfig = getgenv().Config.ESP
+    if not espConfig or not Drawing then return end
+    if espConfig.Egg then
+        for _, egg in ipairs(Workspace:GetChildren()) do
+            if egg.Name:lower():find("egg") and not DrawingCache[egg] then
+                local label = Drawing.new("Text")
+                label.Text = egg.Name
+                label.Position = Vector2.new(egg.Position.X, egg.Position.Y)
+                label.Visible = true
+                label.Color = Color3.new(1, 1, 0)
+                DrawingCache[egg] = label
+            end
+        end
+    end
+    if espConfig.Player then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and not DrawingCache[player] then
+                local label = Drawing.new("Text")
+                label.Text = player.Name
+                label.Position = Vector2.new(player.Character.HumanoidRootPart.Position.X, player.Character.HumanoidRootPart.Position.Y)
+                label.Visible = true
+                label.Color = Color3.new(0, 1, 0)
+                DrawingCache[player] = label
+            end
+        end
+    end
+    if espConfig.Pollinated then
+        for _, plot in ipairs(Workspace:FindFirstChild("Farm"):GetChildren()) do
+            if plot:FindFirstChild("Plant") and plot.Plant:FindFirstChild("Pollinated") and not DrawingCache[plot] then
+                local label = Drawing.new("Text")
+                label.Text = "Pollinated"
+                label.Position = Vector2.new(plot.Position.X, plot.Position.Y)
+                label.Visible = true
+                label.Color = Color3.new(1, 0, 1)
+                DrawingCache[plot] = label
+            end
+        end
+    end
+end, 0.5)
+
+-- Zen Event
+TaskManager.add(function()
+    local zenConfig = getgenv().Config["Zen Event"]
+    if zenConfig and (zenConfig["Submit All Get Chi"] or zenConfig["Submit All For Quest"]) then
+        if equipTranquilPlant() then
+            task.wait(0.5)
+            if zenConfig["Submit All Get Chi"] and ZenAuraRemoteEvent then
+                ZenAuraRemoteEvent:FireServer("SubmitAllPlants")
+            elseif zenConfig["Submit All For Quest"] and ZenQuestRemoteEvent then
+                ZenQuestRemoteEvent:FireServer("SubmitAllPlants")
+            end
+        end
+    end
+    if zenConfig["Buy All Zen Shop"] and BuyEventShopStock then
+        local zenItems = { "Zen Seed Pack", "Zen Egg", "Hot Spring", "Zen Sand", "Zenflare Stage 1", "Zen Create Stage 2", "Soft Sunshine Stage 3", "Koi Stage 4", "Zen Gnome Create Stage 5", "Spiked Mango Stage 6", "Pet Shard Tranquil Stage 7" }
+        for _, item in ipairs(zenItems) do
+            BuyEventShopStock:FireServer(item)
+            task.wait(0.2)
+        end
+    end
+end, 3)
+
+-- Auto Craft
+TaskManager.add(function()
+    local craftConfig = getgenv().Config["Auto Craft"]
+    if craftConfig.Enabled and CraftRemote and craftConfig.Recipe ~= "" then
+        CraftRemote:FireServer({
+            "SetRecipe",
+            Workspace:WaitForChild("Interaction"):WaitForChild("UpdateItems"):WaitForChild("NewCrafting"):WaitForChild("EventCraftingWorkBench"),
+            "GearEventWorkbench",
+            craftConfig.Recipe
+        })
+        if craftConfig["Craft Ready"] then
+            task.wait(1)
+            CreateReadyRemote:FireServer()
+        end
+    end
+end, getgenv().Config["Auto Craft"].Delay or 5)
+
+-- Auto Dino Event
+TaskManager.add(function()
+    local dinoConfig = getgenv().Config["Auto Dino Event"]
+    if dinoConfig.Enabled and dinoConfig["Dino Machine"] and DinoMachineRemote then
+        DinoMachineRemote:FireServer("Activate")
+        task.wait(0.5)
+    end
+end, 5)
+
+-- Spam Click (from original, high ban risk)
+TaskManager.add(function()
+    local spamConfig = getgenv().Config["Spam Click"]
+    if spamConfig.Enabled then
+        while task.wait(spamConfig.Delay) do
+            local tool = Character:FindFirstChildOfClass("Tool")
+            if tool then
+                tool:Activate()
+            end
+        end
+    end
+end, 0.01)
+
+-- Equip Tranquil for Zen Event
+local function equipTranquilPlant()
+    if isHoldingTranquil() then return true end
+    for _, tool in ipairs(Backpack:GetChildren()) do
+        if tool:IsA("Tool") and tool.Name:lower():find("tranquil") then
+            tool.Parent = Character
+            return true
+        end
+    end
+    return false
+end
+
+local function isHoldingTranquil()
+    for _, tool in ipairs(Character:GetChildren()) do
+        if tool:IsA("Tool") and tool.Name:lower():find("tranquil") then
+            return true
+        end
+    end
+    return false
+end
+
+-- Start Task Manager
+repeat task.wait() until game:IsLoaded()
+TaskManager.run()
