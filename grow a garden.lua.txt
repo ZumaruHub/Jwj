@@ -1,0 +1,1424 @@
+
+
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+local Window = WindUI:CreateWindow({
+    Title = "",
+    Icon = "rbxassetid://",
+    Author = "",
+    Folder = "",
+    Size = UDim2.fromOffset(580, 340),
+    Transparent = true,
+    Theme = "Dark",
+    Resizable = true,
+    SideBarWidth = 200,
+    Background = "", 
+    BackgroundImageTransparency = 0.42,
+    HideSearchBar = true,
+    ScrollBarEnabled = false,
+})
+
+
+
+Window:EditOpenButton({
+    Title = "Open Example UI",
+    Icon = "monitor",
+    CornerRadius = UDim.new(0,16),
+    StrokeThickness = 2,
+    Color = ColorSequence.new( 
+        Color3.fromHex("FF0F7B"), 
+        Color3.fromHex("F89B29")
+    ),
+    Draggable = true,
+})
+
+
+local Tabs = {
+    InfoTab = Window:Tab({ Title = "Info", Icon = "info", Desc = "Information" }),
+    GeneralTab = Window:Tab({ Title = "Main", Icon = "mouse-pointer-2", Desc = "Main Features" }),
+    ShopTab = Window:Tab({ Title = "Ui shop", Icon = "clipboard", Desc = "Shop Features" }),
+    SeedTab = Window:Tab({ Title = "Shop", Icon = "shopping-cart", Desc = "Seed event" }),
+    EventTab = Window:Tab({ Title = "Event", Icon = "tree-palm", Desc = "Honey event" }),
+    MiscTab = Window:Tab({ Title = "Misc", Icon = "settings", Desc = "Miscellaneous Features" }),
+    VisualTab = Window:Tab({ Title = "Visual", Icon = "eye", Desc = "Visual Settings" }),
+    EspTab = Window:Tab({ Title = "Esp", Icon = "bomb", Desc = "Mod Features" }),
+}
+
+Window:SelectTab(1)
+
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+local isFarmMoneyEnabled = false
+local isCollectTeleportEnabled = false
+local lastTeleportTime = 0
+local isSelling = false
+local TeleportConnection
+local CollectTeleportThread
+
+local function spamEKey()
+    while isFarmMoneyEnabled do
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+        task.wait(0)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+        task.wait(0)
+    end
+end
+
+local function getOwnedPlot()
+    for _, plot in pairs(workspace.Farm:GetChildren()) do
+        local imp = plot:FindFirstChild("Important")
+        local data = imp and imp:FindFirstChild("Data")
+        local owner = data and data:FindFirstChild("Owner")
+        if owner and owner.Value == player.Name then
+            return plot
+        end
+    end
+    return nil
+end
+
+
+Tabs.InfoTab:Button({
+    Title = "Copy link discord",
+    Callback = function()
+      
+    end
+})
+
+local versionLabel
+pcall(function()
+    versionLabel = game:GetService("CoreGui")
+        .RobloxGui
+        .SettingsClippingShield
+        .SettingsShield
+        .VersionContainer
+        .PlaceVersionLabel
+end)
+
+local placeVersion = versionLabel and versionLabel.Text or "Unknown"
+
+Tabs.InfoTab:Paragraph({
+    Title = "Server version",
+    Desc = placeVersion
+})
+
+
+
+
+
+
+
+
+Tabs.GeneralTab:Section({Title = "Collect"})
+
+
+
+
+local selectedFruit = {}  
+
+Tabs.GeneralTab:Dropdown({    
+    Title = "Select collect fruit",    
+    Values = {
+"Strawberry", 
+"Carrot", 
+"Blueberry", 
+"Orange Tulip", 
+"Tomato",
+ "Corn", 
+ "Daffodil", 
+ "Watermelon", 
+ "Pumpkin", 
+ "Apple",
+ "Bamboo",
+ "Coconut", 
+ "Cactus",
+ "Dragon Fruit",
+ "Mango",
+ "Grape", 
+ "Mushroom", 
+ "Pepper", 
+ "Cacao", 
+ "Beanstalk",
+ "Ember Lily",
+ "Green Apple",
+  "Burning Bud",
+  "Giant Pinecone"
+    },
+    Value = {},
+    Multi = true,
+    AllowNone = true,
+    Callback = function(Value) 
+        selectedFruit = Value
+    end
+})    
+
+local player = game.Players.LocalPlayer
+local TeleportCollect = false
+local collectThread
+
+local function AutoCollectFruits()
+    if collectThread then
+        task.cancel(collectThread)
+        collectThread = nil
+    end
+
+    if TeleportCollect then
+        collectThread = task.spawn(function()
+            while TeleportCollect do
+                local farm_model
+                for _, farm in ipairs(game.Workspace.Farm:GetChildren()) do
+                    local data = farm:FindFirstChild("Important") and farm.Important:FindFirstChild("Data")
+                    if data and data:FindFirstChild("Owner") and data.Owner.Value == player.Name then
+                        farm_model = farm
+                        break
+                    end
+                end
+
+                if not farm_model then
+                    task.wait(0.1)
+                    continue
+                end
+
+                local plants_folder = farm_model.Important:FindFirstChild("Plants_Physical")
+                local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+
+                if not (plants_folder and hrp) then
+                    task.wait(0.1)
+                    continue
+                end
+
+                for _, plant in ipairs(plants_folder:GetChildren()) do
+                    if not TeleportCollect then break end
+                    if plant:IsA("Model") then
+                        local fruits = plant:FindFirstChild("Fruits")
+                        if fruits then
+                            for _, fruit in ipairs(fruits:GetChildren()) do
+                                if table.find(selectedFruit, fruit.Name) then
+                                   for _, part in ipairs(fruit:GetDescendants()) do
+                                      if part:IsA("BasePart") then
+                                         local prompt = part:FindFirstChildOfClass("ProximityPrompt")
+                                         if prompt and prompt.Enabled then
+                                             hrp.CFrame = CFrame.new(part.Position + Vector3.new(0, 2, 0))
+                                             for _ = 1, 3 do
+                                                 fireproximityprompt(prompt)
+                                                 task.wait(0.01)
+                                             end
+                                         end
+                                      end
+                                   end
+                                end
+                            end
+                        end
+                    end
+                end
+                
+                task.wait(0.01)  
+            end
+        end)
+    end
+end
+
+Tabs.GeneralTab:Toggle({    
+    Title = "Auto collect fruit",    
+    Value = false,    
+    Callback = function(state)    
+        TeleportCollect = state
+        AutoCollectFruits()
+    end    
+})
+
+
+
+
+	
+local selectedFruitGay = {}  
+
+Tabs.GeneralTab:Dropdown({    
+    Title = "Select collect mutation",    
+    Values = {
+        "Pollinated",
+        "Celestial",
+        "Moonlit",
+        "Windstruck",
+        "Burnt",
+        "Wet",
+        "Disco",
+        "Twisted",
+        "Choc",
+        "Bloodlit",
+        "Dawnbound",
+        "Molten",
+        "Chilled",
+        "Heavenly",
+        "Shocked",
+        "Voidtouched",
+        "Plasma",
+        "Zombified",
+        "HoneyGlazed",
+        "Frozen"
+    },
+    Value = {},  
+    Multi = true,
+    AllowNone = true,
+    Callback = function(Values) 
+        selectedFruitGay = Values
+    end
+})  
+
+local player = game.Players.LocalPlayer    
+local TeleportPollinatedGay = false    
+local autoCollectThreadGay    
+
+local function AutoCollectFruitsGay()
+    local pickup_radius = 50
+    
+    if autoCollectThreadGay then
+        task.cancel(autoCollectThreadGay) 
+        autoCollectThreadGay = nil
+    end
+    
+    if TeleportPollinatedGay then
+        autoCollectThreadGay = task.spawn(function()
+            local farm
+            for _, f in ipairs(workspace.Farm:GetChildren()) do
+                local data = f:FindFirstChild("Important") and f.Important:FindFirstChild("Data")
+                if data and data:FindFirstChild("Owner") and data.Owner.Value == player.Name then
+                    farm = f
+                    break
+                end
+            end
+    
+            while TeleportPollinatedGay and farm and task.wait() do
+                local plants_folder = farm.Important:FindFirstChild("Plants_Physical")
+                local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    
+                if plants_folder and hrp then
+                    for _, plant in ipairs(plants_folder:GetChildren()) do
+                        if plant:IsA("Model") then
+                            local fruits = plant:FindFirstChild("Fruits")
+                            if fruits then
+                                for _, fruit in ipairs(fruits:GetChildren()) do
+                                   for _, mutation in pairs(selectedFruitGay) do
+                                      if fruit:GetAttribute(mutation) == true then
+                                         for _, part in ipairs(fruit:GetDescendants()) do
+                                             if part:IsA("BasePart") then
+                                                 local prompt = part:FindFirstChildOfClass("ProximityPrompt")
+                                                 if prompt and prompt.Enabled then
+                                                     local fruitPosition = part.Position
+                                                     local distance = (fruitPosition - hrp.Position).Magnitude
+    
+                                                     if distance > pickup_radius then
+                                                         hrp.CFrame = CFrame.new(fruitPosition + Vector3.new(0, 2, 0))
+                                                         task.wait(0.15) 
+                                                     end
+    
+                                                     for _ = 1, 3 do
+                                                         fireproximityprompt(prompt)
+                                                         task.wait(0.025)
+                                                     end
+                                                 end
+                                             end
+                                         end
+                                      end
+                                   end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)  
+    end
+end    
+
+Tabs.GeneralTab:Toggle({    
+    Title = "Auto collect mutation",    
+    Value = false,    
+    Callback = function(state)    
+        TeleportPollinatedGay = state    
+        AutoCollectFruitsGay()
+    end    
+})
+
+
+
+
+
+Tabs.GeneralTab:Section({Title = "Sell"})
+
+
+
+Tabs.GeneralTab:Button({
+    Title = "Sell all",
+    Callback = function()
+        local player = game.Players.LocalPlayer
+		local backpack = player:WaitForChild("Backpack")
+		local replicatedStorage = game:GetService("ReplicatedStorage")
+		local sellEvent = replicatedStorage:WaitForChild("GameEvents"):WaitForChild("Sell_Inventory")
+		
+		local function teleportAndSell()
+			local character = player.Character or player.CharacterAdded:Wait()
+			local hrp = character:WaitForChild("HumanoidRootPart")
+		
+		
+			local originalCFrame = hrp.CFrame
+		
+		
+			local targetPart = workspace:WaitForChild("Tutorial_Points"):WaitForChild("Tutorial_Point_2")
+			hrp.CFrame = targetPart.CFrame + Vector3.new(0, 3, 0)
+		
+		
+			task.wait(0.2)
+			sellEvent:FireServer()
+		
+	
+			hrp.CFrame = originalCFrame
+		end
+		
+	
+		teleportAndSell()
+    end
+})
+
+Tabs.GeneralTab:Button({
+    Title = "Sell this",
+    Callback = function()
+        local player = game.Players.LocalPlayer
+		local backpack = player:WaitForChild("Backpack")
+		local replicatedStorage = game:GetService("ReplicatedStorage")
+		
+		local function teleportAndSell()
+			local character = player.Character or player.CharacterAdded:Wait()
+			local hrp = character:WaitForChild("HumanoidRootPart")
+		
+			
+			local originalCFrame = hrp.CFrame
+		
+			
+			local targetPart = workspace:WaitForChild("Tutorial_Points"):WaitForChild("Tutorial_Point_2")
+			hrp.CFrame = targetPart.CFrame + Vector3.new(0, 3, 0)
+		
+		
+			task.wait(0.2)
+			game:GetService("ReplicatedStorage"):WaitForChild("GameEvents"):WaitForChild("Sell_Item"):FireServer()
+		
+	
+			hrp.CFrame = originalCFrame
+		end
+		teleportAndSell()
+    end
+})
+
+
+Tabs.EventTab:Section({Title = "Zen shop"})
+
+
+
+
+
+
+
+
+
+
+local zenshop = {
+	"Zen Seed Pack",
+	"Zen Egg",
+	"Hot Spring",
+	"Zen Sand",
+	"Tranquil Radar",
+	"Zenflare",
+	"Zen Crate",
+	"Soft Sunshine",
+	"Koi",
+	"Zen Gnome Crate",
+	"Spiked Mango",
+	"Pet Shard Tranquil"
+}
+
+local selected = {}
+local autobuy = false
+local autobuyall = false
+
+game:GetService("RunService").Heartbeat:Connect(function()
+	if autobuyall then
+		for _, item in ipairs(zenshop) do
+			game:GetService("ReplicatedStorage"):WaitForChild("GameEvents"):WaitForChild("BuyEventShopStock"):FireServer(item)
+		end
+	elseif autobuy then
+		for _, item in ipairs(selected) do
+			game:GetService("ReplicatedStorage"):WaitForChild("GameEvents"):WaitForChild("BuyEventShopStock"):FireServer(item)
+		end
+	end
+end)
+
+Tabs.EventTab:Dropdown({
+    Title = "Select zen shop",
+    Values = zenshop,
+    Value = {},
+    Multi = true,
+    AllowNone = true,
+    Callback = function(val)
+        selected = val
+    end
+})
+
+Tabs.EventTab:Toggle({
+    Title = "Auto buy zen shop",
+    Value = false,
+    Callback = function(val)
+        autobuy = val
+    end
+})
+
+Tabs.EventTab:Toggle({
+    Title = "Auto buy all zen shop",
+    Value = false,
+    Callback = function(val)
+        autobuyall = val
+    end
+})
+
+
+
+
+local autoHeld = false
+local autoAll = false
+
+game:GetService("RunService").Heartbeat:Connect(function()
+	if autoHeld then
+		game.ReplicatedStorage.GameEvents.ZenQuestRemoteEvent:FireServer("SubmitHeldPlant")
+	end
+	if autoAll then
+		game.ReplicatedStorage.GameEvents.ZenQuestRemoteEvent:FireServer("SubmitAllPlants")
+	end
+end)
+
+Tabs.EventTab:Toggle({
+    Title = "Auto take this plant zen",
+    Value = false,
+    Callback = function(state)
+        autoHeld = state
+    end
+})
+
+Tabs.EventTab:Toggle({
+    Title = "Auto take all my tranquil plant zen",
+    Value = false,
+    Callback = function(state)
+        autoAll = state
+    end
+})
+
+
+
+
+
+Tabs.EventTab:Section({Title = "Tranquil lv"})
+
+
+local autoHeldTranquil = false
+local autoAllTranquil =false
+
+game:GetService("RunService").Heartbeat:Connect(function()
+	if autoHeldTranquil then
+		game.ReplicatedStorage.GameEvents.ZenAuraRemoteEvent:FireServer("SubmitHeldPlant")
+	end
+	if autoAllTranquil then
+		game.ReplicatedStorage.GameEvents.ZenAuraRemoteEvent:FireServer("SubmitAllPlants")
+	end
+end)
+
+
+
+Tabs.EventTab:Toggle({
+    Title = "Auto take this plant zen lv",
+    Value = false,
+    Callback = function(state)
+        autoHeldTranquil = state
+    end
+})
+
+Tabs.EventTab:Toggle({
+    Title = "Auto take all my tranquil plant zen lv",
+    Value = false,
+    Callback = function(state)
+        autoAllTranquil = state
+    end
+})
+
+
+
+
+
+
+Tabs.ShopTab:Section({Title = "Ui"})
+
+Tabs.ShopTab:Button({
+    Title = "Seed shop",
+    Callback = function()
+        local player = game:GetService("Players").LocalPlayer
+        local pp = player:FindFirstChild("PlayerGui") and player.PlayerGui:FindFirstChild("Seed_Shop")
+        if pp then
+            pp.Enabled = not pp.Enabled
+        end
+    end
+})
+
+Tabs.ShopTab:Button({
+    Title = "Gear shop",
+    Callback = function()
+        local player = game:GetService("Players").LocalPlayer
+        local pp = player:FindFirstChild("PlayerGui") and player.PlayerGui:FindFirstChild("Gear_Shop")
+        if pp then
+            pp.Enabled = not pp.Enabled
+        end
+    end
+})
+
+Tabs.ShopTab:Button({
+    Title = "Cosmetic shop",
+    Callback = function()
+       local player = game:GetService("Players").LocalPlayer
+        local dd = player:FindFirstChild("PlayerGui") and player.PlayerGui:FindFirstChild("CosmeticShop_UI")       
+        if dd then        
+            dd.Enabled = not dd.Enabled
+        end
+    end
+})
+
+
+Tabs.ShopTab:Button({
+    Title = "Egg shop",
+    Callback = function()
+    local player = game:GetService("Players").LocalPlayer
+        local egg = player:FindFirstChild("PlayerGui") and player.PlayerGui:FindFirstChild("PetShop_UI")       
+        if egg then        
+           egg.Enabled = not egg.Enabled
+        end
+    end
+})
+
+
+
+
+
+
+
+local allSeeds = {
+"Strawberry", 
+"Carrot", 
+"Blueberry", 
+"Orange Tulip", 
+"Tomato",
+ "Corn", 
+ "Daffodil", 
+ "Watermelon", 
+ "Pumpkin", 
+ "Apple",
+ "Bamboo",
+ "Coconut", 
+ "Cactus",
+ "Dragon Fruit",
+ "Mango",
+ "Grape", 
+ "Mushroom", 
+ "Pepper", 
+ "Cacao", 
+ "Beanstalk",
+ "Ember Lily",
+ "Green Apple",
+  "Burning Bud",
+  "Giant Pinecone"
+}
+
+local allGears = {
+	"Watering Can",
+	"Trowel",
+	"Basic Sprinkler",
+	"Advanced Sprinkler",
+	"Godly Sprinkler",
+	 "Master Sprinkler",
+	"Favorite Tool",
+	"Recall Wrench",
+	"Harvest Tool",
+	"Friendship Pot",
+	"Cleaning Spray",
+	"Tanning Mirror",
+	"Magnifying Glass",
+	"Medium Toy",
+	"Medium Treat",
+	"Levelup Lollipop"
+}
+
+
+local selectedSeed = { "Strawberry" }
+Tabs.SeedTab:Dropdown({
+    Title = "Select seed shop",
+    Values = allSeeds,
+    Value = selectedSeed,
+    Multi = true,
+    AllowNone = true,
+    Callback = function(Value)
+        selectedSeed = Value
+    end
+})
+
+
+local selectedGear = { "Watering Can" }
+Tabs.SeedTab:Dropdown({
+    Title = "Select gear shop",
+    Values = allGears,
+    Value = selectedGear,
+    Multi = true,
+    AllowNone = true,
+    Callback = function(Value)
+        selectedGear = Value
+    end
+})
+
+
+local autoBuySeed = false
+Tabs.SeedTab:Toggle({
+    Title = "Auto buy select seed",
+    Value = false,
+    Callback = function(state)
+        autoBuySeed = state
+        task.spawn(function()
+            while autoBuySeed do
+                if selectedSeed and typeof(selectedSeed) == "table" then
+                    for _, seed in ipairs(selectedSeed) do
+                        if typeof(seed) == "string" and seed ~= "" then
+                            game:GetService("ReplicatedStorage"):WaitForChild("GameEvents"):WaitForChild("BuySeedStock"):FireServer(seed)
+                            task.wait(0.2)
+                        end
+                    end
+                end
+                task.wait(1)
+            end
+        end)
+    end
+})
+
+
+local autoBuyGear = false
+Tabs.SeedTab:Toggle({
+    Title = "Auto buy select gear",
+    Value = false,
+    Callback = function(state)
+        autoBuyGear = state
+        task.spawn(function()
+            while autoBuyGear do
+                if selectedGear and typeof(selectedGear) == "table" then
+                    for _, gear in ipairs(selectedGear) do
+                        if typeof(gear) == "string" and gear ~= "" then
+                            game:GetService("ReplicatedStorage"):WaitForChild("GameEvents"):WaitForChild("BuyGearStock"):FireServer(gear)
+                            task.wait(0.2)
+                        end
+                    end
+                end
+                task.wait(1)
+            end
+        end)
+    end
+})
+
+
+local autoBuyAllSeeds = false
+Tabs.SeedTab:Toggle({
+    Title = "Auto buy all seed",
+    Value = false,
+    Callback = function(state)
+        autoBuyAllSeeds = state
+        task.spawn(function()
+            while autoBuyAllSeeds do
+                for _, seed in ipairs(allSeeds) do
+                    game:GetService("ReplicatedStorage"):WaitForChild("GameEvents"):WaitForChild("BuySeedStock"):FireServer(seed)
+                    task.wait(0.2)
+                end
+                task.wait(1)
+            end
+        end)
+    end
+})
+
+
+local autoBuyAllGears = false
+Tabs.SeedTab:Toggle({
+    Title = "Auto buy all gear",
+    Value = false,
+    Callback = function(state)
+        autoBuyAllGears = state
+        task.spawn(function()
+            while autoBuyAllGears do
+                for _, gear in ipairs(allGears) do
+                    game:GetService("ReplicatedStorage"):WaitForChild("GameEvents"):WaitForChild("BuyGearStock"):FireServer(gear)
+                    task.wait(0.2)
+                end
+                task.wait(1)
+            end
+        end)
+    end
+})
+
+   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Tabs.MiscTab:Section({Title = "Player Setting"})
+
+
+
+
+
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
+
+local selectedPlayerName = nil
+
+
+local playerNames = {}
+for _, player in ipairs(Players:GetPlayers()) do
+    table.insert(playerNames, player.Name)
+end
+
+ Tabs.MiscTab:Dropdown({
+    Title = "Select player gift pet",
+    Values = playerNames,
+    Value = playerNames[1] or "None",
+    Callback = function(option)
+        selectedPlayerName = option
+    end
+})
+
+
+Tabs.MiscTab:Button({
+    Title = "Gift pet player",
+    Callback = function()
+        if selectedPlayerName then
+            local targetPlayer = Players:FindFirstChild(selectedPlayerName)
+            if targetPlayer then
+                local args = {
+                    "GivePet",
+                    targetPlayer
+                }
+                ReplicatedStorage:WaitForChild("GameEvents")
+                    :WaitForChild("PetGiftingService")
+                    :FireServer(unpack(args))
+            else
+            end
+        else
+        end
+    end
+})
+
+
+
+Tabs.MiscTab:Input({ 
+    Title = "Speed",
+    Placeholder = "Value",
+    Callback = function(value)
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.WalkSpeed = tonumber(value) or 16
+        end
+    end
+})
+
+Tabs.MiscTab:Input({ 
+    Title = "Jump",
+    Placeholder = "Value",
+    Callback = function(value)
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.JumpPower = tonumber(value) or 50
+        end
+    end
+})
+
+Tabs.MiscTab:Button({
+    Title = "Anti AFK",
+    Callback = function()
+        local vu = game:GetService("VirtualUser")
+        player.Idled:Connect(function()
+            vu:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+            task.wait(1)
+            vu:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+        end)
+        WindUI:Notify({
+            Title = "Notification",
+            Content = "Anti AFK enabled.",
+            Icon = "check",
+            Duration = 5,
+        })
+    end
+})
+
+
+Tabs.MiscTab:Button({
+    Title = "Rejoin",
+    Callback = function()
+local ts = game:GetService("TeleportService")
+local p = game:GetService("Players").LocalPlayer
+ts:Teleport(game.PlaceId, p)
+    end
+})
+
+Tabs.VisualTab:Toggle({
+    Title = "Full bright",
+    Value = false, 
+    Callback = function(value)
+        if value then
+            game.Lighting.FogEnd = 100000
+            game.Lighting.FogStart = 0
+        else
+            game.Lighting.FogEnd = 1000
+            game.Lighting.FogStart = 0
+        end
+    end
+})
+
+
+game:GetService("CoreGui").ChildRemoved:Connect(function(child)
+    if child.Name:find("WindUI") then
+        if TeleportConnection then
+            TeleportConnection:Disconnect()
+            TeleportConnection = nil
+        end
+        
+        if CollectTeleportThread then
+            task.cancel(CollectTeleportThread)
+            CollectTeleportThread = nil
+        end
+        
+        isFarmMoneyEnabled = false
+        isCollectAllEnabled = false
+        isCollectTeleportEnabled = false
+        isSelling = false
+    end
+end)
+
+local IJ = false
+Tabs.VisualTab:Toggle({
+    Title = "Inf jump",
+    Value = false, 
+    Callback = function(state)
+        	    IJ = state
+      game:GetService("UserInputService").JumpRequest:Connect(function()
+          if IJ then
+              game:GetService("Players").LocalPlayer.Character:FindFirstChildOfClass('Humanoid'):ChangeState("Jumping")
+          end
+      end)
+    end
+})
+
+
+Tabs.VisualTab:Toggle({
+    Title = "No clip",
+    Value = false, 
+    Callback = function(Value)
+        getgenv().NoclipEnabled = Value 
+        local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local function noclip()
+    local player = Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") and part.CanCollide == true then
+            part.CanCollide = false
+        end
+    end
+end
+local function noclipLoop()
+    RunService.Stepped:Connect(function()
+        if getgenv().NoclipEnabled then
+            noclip()
+        end
+    end)
+end
+noclipLoop()
+    end
+})
+
+
+
+Tabs.VisualTab:Toggle({
+    Title = "Click teleport",
+    Value = false, 
+    Callback = function(Value)
+	    getgenv().clickTeleportEnabled = Value
+local function onTeleportClick()
+    local player = game.Players.LocalPlayer
+    local mouse = player:GetMouse()
+    mouse.Button1Down:Connect(function()
+        if getgenv().clickTeleportEnabled then
+            local targetPosition = mouse.Hit.p  
+            player.Character:MoveTo(targetPosition) 
+        end
+    end)
+end
+onTeleportClick()
+    end
+})
+
+
+
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+
+
+local hideOtherFarms = false
+local hiddenFarms = {}
+
+
+local function hideOtherPlayerFarms()
+   
+    if not hideOtherFarms then
+        for farm, originalParent in pairs(hiddenFarms) do
+            if farm and not farm:IsDescendantOf(Workspace) then
+                farm.Parent = originalParent or Workspace.Farm
+            end
+        end
+        hiddenFarms = {}
+        return
+    end
+
+    
+    for _, farm in ipairs(Workspace.Farm:GetChildren()) do
+        local data = farm:FindFirstChild("Important") and farm.Important:FindFirstChild("Data")
+        local ownerValue = data and data:FindFirstChild("Owner")
+
+        if ownerValue and ownerValue:IsA("StringValue") and ownerValue.Value ~= LocalPlayer.Name then
+            hiddenFarms[farm] = farm.Parent
+            farm.Parent = nil
+        end
+    end
+end
+
+
+Tabs.VisualTab:Toggle({
+    Title = "Remove plant",
+    Value = false, 
+    Callback = function(state)
+	    hideOtherFarms = state
+        hideOtherPlayerFarms()
+    end
+})
+
+
+Tabs.VisualTab:Section({Title = "Server"})
+
+
+ Tabs.VisualTab:Paragraph({
+	Title = "Job id",
+	Desc = game.JobId,
+	Buttons = {
+		{
+			Title = "Copy",
+			Callback = function()
+				setclipboard(game.JobId);
+			end
+		}
+	}
+})
+
+ Tabs.VisualTab:Input({
+	Title = "Enter job id",
+	Callback = function(value)
+		_G.JobId = value;
+	end
+})
+
+
+Tabs.VisualTab:Button({
+	Title = "Join job id",
+	Callback = function()
+		(game:GetService("TeleportService")):TeleportToPlaceInstance(game.PlaceId, _G.JobId);
+	end
+})
+
+
+
+
+
+Workspace.Farm.ChildAdded:Connect(function()
+    if hideOtherFarms then
+        task.wait(0.2)
+        hideOtherPlayerFarms()
+    end
+end)
+
+Workspace.Farm.ChildRemoved:Connect(function()
+    if hideOtherFarms then
+        task.wait(0.2)
+        hideOtherPlayerFarms()
+    end
+end)
+
+
+
+local RunService = game:GetService("RunService")
+local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+
+local connections = getconnections(ReplicatedStorage.GameEvents.PetEggService.OnClientEvent)
+local hatchFunc = getupvalue(getupvalue(connections[1].Function, 1), 2)
+local eggModels = getupvalue(hatchFunc, 1)
+local eggPets = getupvalue(hatchFunc, 2)
+
+
+local ESP_ENABLED = false
+
+
+local espCache = {}
+
+
+local function createESP(eggModel)
+    local uuid = eggModel:GetAttribute("OBJECT_UUID")
+    if not uuid then return end
+    local petName = eggPets[uuid] or "?"
+
+    
+    local label = Drawing.new("Text")
+    label.Text = petName
+    label.Size = 18
+    label.Color = Color3.fromRGB(0, 255, 0)
+    label.Center = true
+    label.Outline = true
+    label.OutlineColor = Color3.new(0, 0, 0)
+    label.Visible = ESP_ENABLED
+
+   
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "PetEggESP_Highlight"
+    highlight.FillColor = Color3.fromRGB(0, 255, 255)
+    highlight.OutlineColor = Color3.fromRGB(0, 0, 0)
+    highlight.FillTransparency = 0.5
+    highlight.OutlineTransparency = 0
+    highlight.Enabled = ESP_ENABLED
+    highlight.Adornee = eggModel
+    highlight.Parent = eggModel
+
+   
+    espCache[uuid] = {
+        model = eggModel,
+        label = label,
+        highlight = highlight
+    }
+end
+
+
+local function removeESP(eggModel)
+    local uuid = eggModel:GetAttribute("OBJECT_UUID")
+    if espCache[uuid] then
+        if espCache[uuid].label then espCache[uuid].label:Remove() end
+        if espCache[uuid].highlight then espCache[uuid].highlight:Destroy() end
+        espCache[uuid] = nil
+    end
+end
+
+
+RunService.RenderStepped:Connect(function()
+    if not ESP_ENABLED then
+        for _, v in pairs(espCache) do
+            if v.label then v.label.Visible = false end
+            if v.highlight then v.highlight.Enabled = false end
+        end
+        return
+    end
+
+    for uuid, v in pairs(espCache) do
+        local egg = v.model
+        if egg and egg:IsDescendantOf(workspace) then
+            local pos, onScreen = Camera:WorldToViewportPoint(egg:GetPivot().Position)
+            if v.label then
+                v.label.Position = Vector2.new(pos.X, pos.Y - 20)
+                v.label.Visible = onScreen
+            end
+            if v.highlight then
+                v.highlight.Enabled = true
+            end
+        else
+            if v.label then v.label.Visible = false end
+            if v.highlight then v.highlight.Enabled = false end
+        end
+    end
+end)
+
+
+for _, egg in ipairs(CollectionService:GetTagged("PetEggServer")) do
+    if egg:GetAttribute("OWNER") == LocalPlayer.Name then
+        createESP(egg)
+    end
+end
+
+
+CollectionService:GetInstanceAddedSignal("PetEggServer"):Connect(function(egg)
+    if egg:GetAttribute("OWNER") == LocalPlayer.Name then
+        createESP(egg)
+    end
+end)
+
+CollectionService:GetInstanceRemovedSignal("PetEggServer"):Connect(removeESP)
+
+
+
+Tabs.EspTab:Toggle({
+    Title = "Esp egg",
+    Value = false, 
+    Callback = function(state)
+	    ESP_ENABLED = state
+        for _, v in pairs(espCache) do
+            if v.label then v.label.Visible = state end
+            if v.highlight then v.highlight.Enabled = state end
+        end
+    end
+})
+
+
+
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+
+local playerESPEnabled = false
+local playerESPCache = {}
+
+
+local function createPlayerESP(player)
+	if player == LocalPlayer then return end
+	if playerESPCache[player] then return end
+
+	local character = player.Character or player.CharacterAdded:Wait()
+	local head = character:WaitForChild("Head", 5)
+	if not head then return end
+
+
+	local nameLabel = Drawing.new("Text")
+	nameLabel.Text = player.Name
+	nameLabel.Size = 16
+	nameLabel.Color = Color3.fromRGB(0, 255, 255)
+	nameLabel.Center = true
+	nameLabel.Outline = true
+	nameLabel.OutlineColor = Color3.new(0, 0, 0)
+	nameLabel.Visible = false
+
+	
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "PlayerESP_Highlight"
+	highlight.FillColor = Color3.fromRGB(0, 255, 255)
+	highlight.OutlineColor = Color3.fromRGB(0, 0, 0)
+	highlight.FillTransparency = 0.4
+	highlight.OutlineTransparency = 0
+	highlight.Enabled = false
+	highlight.Parent = character
+	highlight.Adornee = character
+
+	playerESPCache[player] = {
+		nameLabel = nameLabel,
+		highlight = highlight,
+		character = character
+	}
+end
+
+
+local function removePlayerESP(player)
+	local data = playerESPCache[player]
+	if data then
+		if data.nameLabel then data.nameLabel:Remove() end
+		if data.highlight then data.highlight:Destroy() end
+		playerESPCache[player] = nil
+	end
+end
+
+
+RunService.RenderStepped:Connect(function()
+	for player, data in pairs(playerESPCache) do
+		local char = data.character
+		if char and char:FindFirstChild("Head") then
+			local head = char.Head
+			local pos, onScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.5, 0))
+
+			data.nameLabel.Visible = playerESPEnabled and onScreen
+			data.highlight.Enabled = playerESPEnabled
+
+			if data.nameLabel.Visible then
+				data.nameLabel.Position = Vector2.new(pos.X, pos.Y)
+			end
+		end
+	end
+end)
+
+
+for _, player in ipairs(Players:GetPlayers()) do
+	createPlayerESP(player)
+end
+
+Players.PlayerAdded:Connect(function(player)
+	player.CharacterAdded:Connect(function()
+		task.wait(1)
+		createPlayerESP(player)
+	end)
+end)
+
+
+Players.PlayerRemoving:Connect(removePlayerESP)
+
+
+
+Tabs.EspTab:Toggle({
+    Title = "Esp player",
+    Value = false, 
+    Callback = function(state)
+	    playerESPEnabled = state
+    end
+})
+
+
+
+
+
+
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Camera = workspace.CurrentCamera
+
+
+local pollinatedESPEnabled = false
+local pollinatedCache = {}
+
+
+local function createPollinatedESP(fruitModel)
+	if not fruitModel:IsDescendantOf(workspace) then return end
+	local objectId = fruitModel:GetDebugId()
+
+	
+	local label = Drawing.new("Text")
+	label.Text = "Pollinated"
+	label.Size = 16
+	label.Color = Color3.fromRGB(255, 255, 0)
+	label.Outline = true
+	label.OutlineColor = Color3.new(0, 0, 0)
+	label.Center = true
+	label.Visible = false
+
+	
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "PollinatedESP_Highlight"
+	highlight.FillColor = Color3.fromRGB(255, 255, 0)
+	highlight.OutlineColor = Color3.fromRGB(0, 0, 0)
+	highlight.FillTransparency = 0.5
+	highlight.OutlineTransparency = 0
+	highlight.Adornee = fruitModel
+	highlight.Enabled = false
+	highlight.Parent = fruitModel
+
+	pollinatedCache[objectId] = {
+		model = fruitModel,
+		label = label,
+		highlight = highlight
+	}
+end
+
+
+RunService.RenderStepped:Connect(function()
+	for id, data in pairs(pollinatedCache) do
+		local model = data.model
+		if model and model:IsDescendantOf(workspace) then
+			local rootPart = model:FindFirstChildWhichIsA("BasePart")
+			if rootPart then
+				local screenPos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
+				data.label.Visible = pollinatedESPEnabled and onScreen
+				data.highlight.Enabled = pollinatedESPEnabled
+
+				if data.label.Visible then
+					data.label.Position = Vector2.new(screenPos.X, screenPos.Y - 15)
+				end
+			end
+		else
+
+			if data.label then data.label:Remove() end
+			if data.highlight then data.highlight:Destroy() end
+			pollinatedCache[id] = nil
+		end
+	end
+end)
+
+
+local function scanPollinatedFruits()
+	local farm
+	for _, f in ipairs(workspace.Farm:GetChildren()) do
+		local data = f:FindFirstChild("Important") and f.Important:FindFirstChild("Data")
+		if data and data:FindFirstChild("Owner") and data.Owner.Value == LocalPlayer.Name then
+			farm = f
+			break
+		end
+	end
+
+	if not farm then return end
+
+	local plantsFolder = farm.Important:FindFirstChild("Plants_Physical")
+	if not plantsFolder then return end
+
+	for _, plant in ipairs(plantsFolder:GetChildren()) do
+		if plant:IsA("Model") then
+			local fruits = plant:FindFirstChild("Fruits")
+			if fruits then
+				for _, fruit in ipairs(fruits:GetChildren()) do
+					if fruit:GetAttribute("Pollinated") == true then
+						local id = fruit:GetDebugId()
+						if not pollinatedCache[id] then
+							createPollinatedESP(fruit)
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
+Tabs.EspTab:Toggle({
+    Title = "Esp pollinated",
+    Value = false, 
+    Callback = function(state)
+	    pollinatedESPEnabled = state
+		if state then
+			scanPollinatedFruits()
+		end
+    end
+})
+
+
+
+
+
+
